@@ -69,6 +69,7 @@ TH1D createHistogram(const std::string& name) {
     return hist;
 }
 
+
 // Characterizes the effective of masking
 void characterize(std::string infile, std::string outfile) {
 
@@ -171,10 +172,11 @@ void characterize(std::string infile, std::string outfile) {
 }
 
 
+
 void serialize_data(std::string infile) {
 
     // Open the JSON file
-    std::ifstream jsonfile("/afs/cern.ch/user/i/ielmenga/public/MicroMega/C01.json");
+    std::ifstream jsonfile("/afs/cern.ch/user/i/ielmenga/public/Micromegas/C01.json");
     
     // Check if the file was opened successfully
     if (!jsonfile.is_open()) {
@@ -228,6 +230,7 @@ void serialize_data(std::string infile) {
     tree->SetBranchStatus("nhits", true);
     tree->SetBranchStatus("radius", true);
     tree->SetBranchStatus("channel", true);
+    tree->SetBranchStatus("sector", true);
 
     std::vector<int> *strips = nullptr;
     std::vector<unsigned int> *vmmids = nullptr;
@@ -235,6 +238,7 @@ void serialize_data(std::string infile) {
     std::vector<unsigned int> *hits = nullptr;
     std::vector<unsigned int> *radii = nullptr;
     std::vector<unsigned int> *channels = nullptr;
+    std::vector<int> *sectors = nullptr;
 
     tree->SetBranchAddress("strip", &strips);
     tree->SetBranchAddress("vmmid", &vmmids);
@@ -242,6 +246,7 @@ void serialize_data(std::string infile) {
     tree->SetBranchAddress("nhits", &hits);
     tree->SetBranchAddress("radius", &radii);
     tree->SetBranchAddress("channel", &channels);
+    tree->SetBranchAddress("sector", &sectors);
     
 
     // Loop through all tree entries
@@ -253,6 +258,8 @@ void serialize_data(std::string infile) {
         tree->GetEntry(i);
         // Loop through events in the entry
         for (unsigned int n=0; n<strips->size(); n++) {
+            // Only check for Sector 1
+            if (sectors->at(n) != -1) { continue;}
             
             //Produce the node label from the layer and radius
             std::string node = intsToNode(layers->at(n), radii->at(n));
