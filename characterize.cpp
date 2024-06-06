@@ -189,29 +189,29 @@ void serialize_data(std::string infile) {
     jsonfile >> data;
     
     // Iterate through the data keys and make another map for every top level key beginning with MMFE8
-    std::map<std::string, std::map<std::string, std::vector<std::pair<int, int>>>> hitMap;
+    std::map<std::string, std::map<std::string, std::vector<std::vector<int>>>> hitMap;
 
     for (auto& [key, value] : data.items()) {
         // Add all the MMFE8's to the top level of the dictionary
         if (key.rfind("MMFE8_", 0) == 0) {
-            hitMap.insert({key, std::map<std::string, std::vector<std::pair<int, int>>>()});
+            hitMap.insert({key, std::map<std::string, std::vector<std::vector<int>>>()});
             // Add a vmm dictionary to the next level within each mmfe8
             for (int i=0; i<8; i++) {
                 // Create the key value for each vmm
                 std::string vmm_label = "vmm" + std::to_string(i);
-                // Assign to that key a vector of pairs of ints. The first int is the
-                // masking status of the channel. The second int says if the channel has a hit
-                hitMap[key][vmm_label] = std::vector<std::pair<int, int>>(64, std::make_pair(0, 0));
+                // Assign to that key a vector of vector of ints. The first int in the final vector is the
+                // masking status of the channel. the 2nd hit is whether sector -1 has hits, the 3rd for sector -2 and so on
+                hitMap[key][vmm_label] = std::vector<std::vector<int>>(64, std::vector<int>(17, 0));
+
                 
-                // Now loop through all the vmms and set the masking status on the first pair items
+                // Now loop through all the vmms and set the masking status on the first vector element
                 for (int j=0; j<64; j++) {
-                    hitMap[key][vmm_label].at(j).first = data[key][vmm_label]["channel_sm"].at(j);
+                    hitMap[key][vmm_label].at(j).at(0) = data[key][vmm_label]["channel_sm"].at(j);
                 }
             }
         }
     }
 
-    
     // Open TFiles
     TFile *file = TFile::Open(infile.c_str(), "READ");
     if (!file || file->IsZombie()) {
@@ -258,8 +258,6 @@ void serialize_data(std::string infile) {
         tree->GetEntry(i);
         // Loop through events in the entry
         for (unsigned int n=0; n<strips->size(); n++) {
-            // Only check for Sector 1
-            if (sectors->at(n) != -1) { continue;}
             
             //Produce the node label from the layer and radius
             std::string node = intsToNode(layers->at(n), radii->at(n));
@@ -270,8 +268,8 @@ void serialize_data(std::string infile) {
             std::string vmm_label = "vmm" + std::to_string(vmmids->at(n));
             auto vmm = mmfe8.at(vmm_label);
 
-            // If there is a hit at the channel, set the second int in the channel pair to 1
-            hitMap[node][vmm_label].at(channels->at(n)).second = 1;
+            // If there is a hit at the channel, set the hit status for the appropriate sector to 1
+            hitMap[node][vmm_label].at(channels->at(n)).at(-1 * sectors->at(n)) = 1;
         }
     }
 
