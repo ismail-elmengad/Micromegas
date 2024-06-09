@@ -73,6 +73,7 @@ TH1D createHistogram(const std::string& name) {
 // Characterizes the effective of masking
 void characterize(std::string infile, std::string outfile) {
 
+
     // Open the JSON file
     std::ifstream jsonfile("C01.json");
     
@@ -174,7 +175,7 @@ void characterize(std::string infile, std::string outfile) {
 
 
 void serialize_data(std::string infile) {
-
+    /*
     // Open the JSON file
     std::ifstream jsonfile("/afs/cern.ch/user/i/ielmenga/public/Micromegas/C01.json");
     
@@ -187,26 +188,56 @@ void serialize_data(std::string infile) {
     // Parse the JSON data
     json data;
     jsonfile >> data;
+    */
+
+    // Array to hold the file names
+    std::string filenames[16] = {
+        "C01.json", "C02.json", "C03.json", "C04.json", "C05.json", "C06.json", "C07.json", "C08.json",
+        "C09.json", "C10.json", "C11.json", "C12.json", "C13.json", "C14.json", "C15.json", "C16.json"
+    };
+
+    // Array to hold the JSON data objects
+    json data[16];
+
+    // Loop through each file and load the JSON data
+    for (int i = 0; i < 16; ++i) {
+        // Open the JSON file
+        std::ifstream jsonfile("/afs/cern.ch/user/i/ielmenga/public/Micromegas/config_files/" + filenames[i]);
+
+        // Check if the file was opened successfully
+        if (!jsonfile.is_open()) {
+            std::cerr << "Failed to open file: " << filenames[i] << std::endl;
+            return;
+        }
+
+        // Parse the JSON data
+        jsonfile >> data[i];
+
+        // Close the file
+        jsonfile.close();
+    }
     
-    // Iterate through the data keys and make another map for every top level key beginning with MMFE8
-    std::map<std::string, std::map<std::string, std::vector<std::vector<int>>>> hitMap;
+    // A map from sector -> MMFE8, MMFE8->vmm, vmm->Channel, channel has 2 elements, masking status & hits present
+    std::map<std::string, std::map<std::string, std::map<std::string, std::vector<std::vector<int>>>>> hitMap;
 
-    for (auto& [key, value] : data.items()) {
-        // Add all the MMFE8's to the top level of the dictionary
-        if (key.rfind("MMFE8_", 0) == 0) {
-            hitMap.insert({key, std::map<std::string, std::vector<std::vector<int>>>()});
-            // Add a vmm dictionary to the next level within each mmfe8
-            for (int i=0; i<8; i++) {
-                // Create the key value for each vmm
-                std::string vmm_label = "vmm" + std::to_string(i);
-                // Assign to that key a vector of vector of ints. The first int in the final vector is the
-                // masking status of the channel. the 2nd hit is whether sector -1 has hits, the 3rd for sector -2 and so on
-                hitMap[key][vmm_label] = std::vector<std::vector<int>>(64, std::vector<int>(17, 0));
+    // Loop through sectors
+    for (int j=1; j<17; j++) {
+        // Iterate through the data keys and make another map for every key beginning with MMFE8 in the sector
+        for (auto& [key, value] : data[j-1].items()) {
+            if (key.rfind("MMFE8_", 0) == 0) {
+                hitMap[std::to_string(j)].insert({key, std::map<std::string, std::vector<std::vector<int>>>()});
+                // Add a vmm dictionary to the next level within each mmfe8
+                for (int i=0; i<8; i++) {
+                    // Create the key value for each vmm
+                    std::string vmm_label = "vmm" + std::to_string(i);
+                    // Assign to that key a vector of 2 ints. The first int in the final vector is the
+                    // masking status of the channel. the 2nd hit is whether the channel has hits
+                    hitMap[std::to_string(j)][key][vmm_label] = std::vector<std::vector<int>>(64, std::vector<int>(2, 0));
 
-                
-                // Now loop through all the vmms and set the masking status on the first vector element
-                for (int j=0; j<64; j++) {
-                    hitMap[key][vmm_label].at(j).at(0) = data[key][vmm_label]["channel_sm"].at(j);
+                    // Now loop through all the vmms and set the masking status on the first vector element
+                    for (int k=0; k<64; k++) {
+                        hitMap[std::to_string(j)][key][vmm_label].at(k).at(0) = data[j-1][key][vmm_label]["channel_sm"].at(k);
+                    }
                 }
             }
         }
@@ -247,29 +278,31 @@ void serialize_data(std::string infile) {
     tree->SetBranchAddress("radius", &radii);
     tree->SetBranchAddress("channel", &channels);
     tree->SetBranchAddress("sector", &sectors);
-    
 
     // Loop through all tree entries
     int nentries = tree->GetEntries();
     for (int i=0; i<nentries; i++) {
+
         // Progress bar
         if (i % 100 == 0) { std::cout << i << "/" << nentries << " entries processed\n"; }
-
         tree->GetEntry(i);
+
         // Loop through events in the entry
         for (unsigned int n=0; n<strips->size(); n++) {
             
+            std::cout << "b1" << std::endl;
             //Produce the node label from the layer and radius
             std::string node = intsToNode(layers->at(n), radii->at(n));
 
-            // Find the node in the JSON data
-            auto mmfe8 = data.at(node);
+            std::cout << "b2" << std::endl;
             // Get the mmf dictionary
             std::string vmm_label = "vmm" + std::to_string(vmmids->at(n));
-            auto vmm = mmfe8.at(vmm_label);
 
+            std::cout << "b3" << std::endl;
             // If there is a hit at the channel, set the hit status for the appropriate sector to 1
-            hitMap[node][vmm_label].at(channels->at(n)).at(-1 * sectors->at(n)) = 1;
+            // hitmap[sector][MMFE8][vmm][channel][hits present] = 1
+            hitMap[std::to_string((-1) * sectors->at(n))][node][vmm_label].at(channels->at(n)).at(1) = 1;
+            std::cout << "b4" << std::endl;
         }
     }
 
@@ -282,6 +315,5 @@ void serialize_data(std::string infile) {
 
 
 int main() {
-    serialize_data("/data1/mmg_thresholdValidation1khz_150424/data_test.00473379.calibration_1khz.daq.RAW._lb0000._SFO-1._0005.simple.root");
-    return 0;
+    serialize_data("/data3/mmg_thresholdValidation1khz_150424/data_test.00473376.calibration_1khz.daq.RAW._lb0000._SFO-1._0005.simple.root");
 }
