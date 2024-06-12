@@ -48,19 +48,17 @@ def checkMMFE8(serialized_data, sector, node):
     return (tot_unmasked_no_hits, tot_unmasked_hits, tot_masked_no_hits, tot_masked_hits)
 
 
-
 # Loop through the serialized json file
 with open("channel_performance.json") as json_file:
     data = json.load(json_file)
 
-
-# Create figures with 4 rows and 4 columns of subplots
-fig0, axs0 = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
-fig0.suptitle('All Channels - mmg_thresholdValidation1khz_150424 - Side C')
-fig1, axs1 = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
-fig1.suptitle('Masked Channels - mmg_thresholdValidation1khz_150424 -  Side C')
-fig2, axs2 = plt.subplots(nrows=4, ncols=4, figsize=(16, 12))
-fig2.suptitle('Unmasked Channels - mmg_thresholdValidation1khz_150424 -  Side C')
+# Create figures with 4 rows and 8 columns of subplots
+fig0, axs0 = plt.subplots(nrows=8, ncols=4, figsize=(24, 32))
+fig0.suptitle('All Channels - mmg_thresholdValidation1khz_150424_Run473376', fontsize=30)
+fig1, axs1 = plt.subplots(nrows=8, ncols=4, figsize=(24, 32))
+fig1.suptitle('Masked Channels - mmg_thresholdValidation1khz_150424_Run473376', fontsize=30)
+fig2, axs2 = plt.subplots(nrows=8, ncols=4, figsize=(24, 32))
+fig2.suptitle('Unmasked Channels - mmg_thresholdValidation1khz_150424_Run473376', fontsize=30)
 
 # Flatten the axs arrays to iterate over each subplot
 axs0 = axs0.flatten()
@@ -68,17 +66,17 @@ axs1 = axs1.flatten()
 axs2 = axs2.flatten()
 
 # Loop through the sectors and create pie charts for each sector
-for i, (ax0, ax1, ax2) in enumerate(zip(axs0, axs1, axs2), start=1):
+for idx, i in enumerate(list(range(-16, 0)) + list(range(1, 17))):
     unmasked_with_hits = 0
     unmasked_without_hits = 0
     masked_with_hits = 0
     masked_without_hits = 0
     # Loop through MMFE8s
-    for key in data[str(i)]:
+    for mmfe8 in data[str(i)]:
         # Loop through vmms
-        for vmm in data[str(i)][key]:
+        for vmm in data[str(i)][mmfe8]:
             # Loop through channels
-            for channel in data[str(i)][key][vmm]:
+            for channel in data[str(i)][mmfe8][vmm]:
                 if (channel[0] == 0 and channel[1] == 0):
                     unmasked_without_hits += 1
                 elif (channel[0] == 0 and channel[1] == 1):
@@ -86,39 +84,42 @@ for i, (ax0, ax1, ax2) in enumerate(zip(axs0, axs1, axs2), start=1):
                 elif (channel[0] == 1 and channel[1] == 0):
                     masked_without_hits += 1
                 elif (channel[0] == 1 and channel[1] == 1):
+                    print(f'{i}\n')
                     masked_with_hits += 1
 
     # Get various fractions of masking/hit statistics
     total_channels = unmasked_with_hits + unmasked_without_hits + masked_with_hits + masked_without_hits
     masked_channels = masked_with_hits + masked_without_hits
-    umasked_channels = total_channels - masked_channels
+    umasked_channels = unmasked_with_hits + unmasked_without_hits
 
     # Create pie charts for all four categories
     sizes = [masked_with_hits / total_channels, masked_without_hits / total_channels,
              unmasked_with_hits / total_channels, unmasked_without_hits / total_channels]
     labels = ['Masked w/ hits', 'Masked w/out hits', 'Unmasked w/ hits', 'Unmasked w/out hits']
-    ax0.pie(sizes, autopct='%1.3f%%')
-    ax0.set_title(f'Sector {-i}')
+    axs0[idx].pie(sizes, autopct='%1.3f%%')
+    axs0[idx].set_title(f'Sector {i}')
 
     # Create pie charts for masked channels
     masked_sizes = [masked_with_hits / masked_channels, masked_without_hits / masked_channels]
     masked_labels = ['Masked w/ hits', 'Masked w/out hits']
-    ax1.pie(masked_sizes, autopct='%1.3f%%')
-    ax1.set_title(f'Sector {-i}')
+    axs1[idx].pie(masked_sizes, autopct='%1.3f%%')
+    axs1[idx].set_title(f'Sector {i}')
 
     # Create pie charts for unmasked channels
     unmasked_sizes = [unmasked_with_hits / umasked_channels, unmasked_without_hits / umasked_channels]
     unmasked_labels = ['Unmasked w/ hits', 'Unmasked w/out hits']
-    ax2.pie(unmasked_sizes, autopct='%1.3f%%')
-    ax2.set_title(f'Sector {-i}')
+    axs2[idx].pie(unmasked_sizes, autopct='%1.3f%%')
+    axs2[idx].set_title(f'Sector {i}')
 
 # Add legends to the dummy plots
-fig0.legend(labels, loc='lower center', ncol=4, bbox_to_anchor=(0.5, 0.93))
-fig1.legend(masked_labels, loc='lower center', ncol=2, bbox_to_anchor=(0.5, 0.93))
-fig2.legend(unmasked_labels, loc='lower center', ncol=2, bbox_to_anchor=(0.5, 0.93))
+fig0.legend(labels, loc='lower center', ncol=4, bbox_to_anchor=(0.5, -0.1), fontsize=25)
+fig1.legend(masked_labels, loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.1), fontsize=50)
+fig2.legend(unmasked_labels, loc='lower center', ncol=2, bbox_to_anchor=(0.5, -0.1), fontsize=50)
 
-# Adjust the spacing between subplots
-plt.subplots_adjust(wspace=0.4, hspace=0.6)
+# Alternatively, use subplots_adjust
+fig0.subplots_adjust(wspace=0.2, hspace=0.1)
+fig1.subplots_adjust(wspace=0.2, hspace=0.2)
+fig2.subplots_adjust(wspace=0.2, hspace=0.2)
 
 # Save the figures
 fig0.savefig('all_categories_all_sectors.png', dpi=300, bbox_inches='tight')
